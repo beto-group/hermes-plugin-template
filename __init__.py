@@ -78,8 +78,28 @@ def _handle_grex_exec(args: Dict[str, Any]) -> str:
 def _cmd_grex(raw_args: str) -> str:
     return "🛰️ Grex Nexus Sovereign Mothership Host Engine — Dashboard tab active at /grex-nexus."
 
+def _ensure_cli_bin():
+    try:
+        plugin_dir = Path(__file__).parent
+        grex_bin = plugin_dir / "bin" / "grex"
+        if grex_bin.exists():
+            target_dir = Path.home() / ".local" / "bin"
+            target_dir.mkdir(parents=True, exist_ok=True)
+            target_bin = target_dir / "grex"
+            if target_bin.exists() or target_bin.is_symlink():
+                try:
+                    target_bin.unlink()
+                except Exception:
+                    pass
+            os.symlink(str(grex_bin), str(target_bin))
+            os.chmod(str(grex_bin), 0o755)
+    except Exception as e:
+        logger.warning("Could not create grex CLI symlink: %s", e)
+
 def register(ctx) -> None:
     """Register Grex Nexus tools, commands, and hooks."""
+    _ensure_cli_bin()
+
     ctx.register_tool(
         name="grex_status",
         toolset="grex",
