@@ -1,6 +1,6 @@
 {
-  "name": "grex-nexus",
-  "label": "Grex Nexus",
+  "name": "hermes-plugin-template",
+  "label": "Grex Nexus Mothership",
   "description": "Grex Nexus Sovereign Mothership Host Engine & Tiling WM Dashboard for Hermes.",
   "icon": "LayoutGrid",
   "version": "1.0.0",

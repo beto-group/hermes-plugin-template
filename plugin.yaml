@@ -1,5 +1,5 @@
 # Hermes Plugin Manifest — Grex Nexus Mothership
-name: grex-nexus
+name: hermes-plugin-template
 version: 1.0.0
 description: Grex Nexus Sovereign Mothership Host Engine & Tiling WM Dashboard for Hermes.
 author: beto-group
