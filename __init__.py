@@ -1,133 +1,106 @@
-"""Hermes Plugin Template — `/test`
+"""Grex Nexus Sovereign Mothership Plugin — Hermes Agent Integration.
 
-A minimal-but-complete Hermes plugin you can read, copy, and extend while
-learning the plugin system. It registers:
-
-  1. a TOOL   (`hello_world`)     — callable by the agent like any built-in tool
-  2. a HOOK   (`post_tool_call`)  — runs after every tool the agent calls
-  3. a SLASH COMMAND (`/ping`)    — an in-session command the user can type
-
-How a plugin is loaded (verified against hermes-agent
-`hermes_cli/plugins.py`):
-
-  * The loader scans ~/.hermes/plugins/<name>/ (user plugins), plus bundled /
-    project / pip sources.
-  * Each directory plugin must have a `plugin.yaml` manifest and an
-    `__init__.py` that defines `register(ctx)`.
-  * The loader calls `register(ctx)` once. You use `ctx.register_tool(...)`,
-    `ctx.register_hook(...)`, `ctx.register_command(...)` to contribute
-    behavior. `ctx` is the PluginContext.
-
-Enable this plugin in ~/.hermes/config.yaml:
-
-    plugins:
-      enabled:
-        - test
-
-Then reload: `hermes doctor` or just start a new `hermes` session.
-Debug loading with: `HERMES_PLUGINS_DEBUG=1 hermes chat -q hi`
+Provides:
+  1. Dashboard UI tab: Grex Nexus Sovereign Mothership (Tiling WM + Component Store)
+  2. Tools: `grex_status`, `grex_exec`
+  3. Slash command: `/grex`
 """
 
 from __future__ import annotations
 
 import logging
-from pathlib import Path
+import urllib.request
+import json
 from typing import Any, Dict
 
-logger = logging.getLogger("hermes.plugins.test")
+logger = logging.getLogger("hermes.plugins.grex_nexus")
 
-HERMES_HOME = Path(
-    __import__("os").environ.get("HERMES_HOME", Path.home() / ".hermes")
-)
-
-
-# ---------------------------------------------------------------------------
-# 1. TOOL
-# ---------------------------------------------------------------------------
-# A tool schema is a standard function-calling schema (name + JSON-Schema
-# `parameters`). The handler receives the parsed args dict and returns a
-# string (the tool result the model sees).
-
-HELLO_SCHEMA: Dict[str, Any] = {
-    "name": "hello_world",
-    "description": (
-        "Template tool. Greets the user by name and reports the Hermes home "
-        "directory. Use this to confirm the test plugin is loaded and callable."
-    ),
+GREX_STATUS_SCHEMA: Dict[str, Any] = {
+    "name": "grex_status",
+    "description": "Get runtime telemetry and status for Grex Nexus Sovereign Mothership, Podman containers, and sidecar daemon.",
     "parameters": {
         "type": "object",
-        "properties": {
-            "name": {
-                "type": "string",
-                "description": "Who to greet (default: 'world').",
-            },
-        },
+        "properties": {},
         "required": [],
     },
 }
 
+GREX_EXEC_SCHEMA: Dict[str, Any] = {
+    "name": "grex_exec",
+    "description": "Execute a sovereign host command via Grex Nexus sidecar daemon.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "command": {
+                "type": "string",
+                "description": "The bash command string to execute.",
+            },
+        },
+        "required": ["command"],
+    },
+}
 
-def _handle_hello(args: Dict[str, Any]) -> str:
-    """Handler signature: fn(args: dict) -> str."""
-    who = (args.get("name") or "world").strip() or "world"
-    return (
-        f"Hello, {who}! 👋\n"
-        f"This is the `test` plugin tool running.\n"
-        f"Hermes home: {HERMES_HOME}"
-    )
+def _handle_grex_status(args: Dict[str, Any]) -> str:
+    try:
+        req = urllib.request.urlopen("http://host.containers.internal:7777/api/status", timeout=3)
+        data = json.loads(req.read().decode("utf-8"))
+        return f"🟢 Grex Nexus Sidecar Daemon Online:\n{json.dumps(data, indent=2)}"
+    except Exception:
+        try:
+            req = urllib.request.urlopen("http://localhost:7777/api/status", timeout=3)
+            data = json.loads(req.read().decode("utf-8"))
+            return f"🟢 Grex Nexus Sidecar Daemon Online:\n{json.dumps(data, indent=2)}"
+        except Exception as ex:
+            return f"🔴 Grex Nexus Sidecar Daemon offline or unreachable: {ex}"
 
+def _handle_grex_exec(args: Dict[str, Any]) -> str:
+    cmd_str = args.get("command", "")
+    if not cmd_str:
+        return "Error: command string required."
+    try:
+        payload = json.dumps({"command": cmd_str}).encode("utf-8")
+        url = "http://host.containers.internal:7777/api/exec"
+        req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=10) as response:
+            res = json.loads(response.read().decode("utf-8"))
+            return f"Exit Code: {res.get('exit_code', 0)}\nStdout:\n{res.get('stdout', '')}\nStderr:\n{res.get('stderr', '')}"
+    except Exception:
+        try:
+            payload = json.dumps({"command": cmd_str}).encode("utf-8")
+            url = "http://localhost:7777/api/exec"
+            req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(req, timeout=10) as response:
+                res = json.loads(response.read().decode("utf-8"))
+                return f"Exit Code: {res.get('exit_code', 0)}\nStdout:\n{res.get('stdout', '')}\nStderr:\n{res.get('stderr', '')}"
+        except Exception as ex:
+            return f"Execution failed: {ex}"
 
-# ---------------------------------------------------------------------------
-# 2. HOOK
-# ---------------------------------------------------------------------------
-# Lifecycle hooks the core invokes at fixed points. Valid names (subset):
-#   pre_tool_call, post_tool_call, transform_terminal_output,
-#   transform_tool_result, ...
-# A post_tool_call callback receives kwargs like:
-#   tool_name, args, result, success, ...
-
-def _on_post_tool_call(**kwargs: Any) -> None:
-    tool_name = kwargs.get("tool_name")
-    success = kwargs.get("success")
-    logger.debug("[test plugin] tool %s finished (success=%s)", tool_name, success)
-
-
-# ---------------------------------------------------------------------------
-# 3. SLASH COMMAND
-# ---------------------------------------------------------------------------
-# Slash-command handler signature: fn(raw_args: str) -> str | None
-# It may also be async. Returned string is shown to the user.
-
-def _cmd_ping(raw_args: str) -> str:
-    return "pong 🏓 (from the `test` plugin)"
-
-
-# ---------------------------------------------------------------------------
-# register() — the single entry point the loader calls.
-# ---------------------------------------------------------------------------
+def _cmd_grex(raw_args: str) -> str:
+    return "🛰️ Grex Nexus Sovereign Mothership Host Engine — Dashboard tab active at /grex-nexus."
 
 def register(ctx) -> None:
-    """Called once by the plugin loader. Contribute tools/hooks/commands here."""
-
-    # Tool. `toolset` groups your tools in `hermes tools` output.
-    # `emoji` is cosmetic. `check_fn` (optional) gates dispatch at call time.
+    """Register Grex Nexus tools, commands, and hooks."""
     ctx.register_tool(
-        name="hello_world",
-        toolset="test",
-        schema=HELLO_SCHEMA,
-        handler=_handle_hello,
-        emoji="👋",
+        name="grex_status",
+        toolset="grex",
+        schema=GREX_STATUS_SCHEMA,
+        handler=_handle_grex_status,
+        emoji="🛰️",
     )
 
-    # Lifecycle hook.
-    ctx.register_hook("post_tool_call", _on_post_tool_call)
+    ctx.register_tool(
+        name="grex_exec",
+        toolset="grex",
+        schema=GREX_EXEC_SCHEMA,
+        handler=_handle_grex_exec,
+        emoji="⚡",
+    )
 
-    # In-session slash command: type `/ping` during a conversation.
     ctx.register_command(
-        name="ping",
-        handler=_cmd_ping,
-        description="Template slash command from the test plugin.",
+        name="grex",
+        handler=_cmd_grex,
+        description="Show Grex Nexus Sovereign Mothership status.",
         args_hint="",
     )
 
-    logger.info("[test plugin] registered tool=hello_world, command=/ping, hook=post_tool_call")
+    logger.info("[grex-nexus] Registered tools (grex_status, grex_exec) and slash command (/grex)")
