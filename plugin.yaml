@@ -1,0 +1,37 @@
+# Hermes Plugin Manifest
+# ---------------------------------------------------------------------------
+# Every directory plugin MUST contain a plugin.yaml manifest AND an
+# __init__.py with a register(ctx) function.
+#
+# Field reference (verified against hermes-agent hermes_cli/plugins.py):
+#   name          (required) unique plugin id; the folder can be named
+#                  differently but `name` here is the id used everywhere.
+#   version       (recommended) semver string.
+#   description   (recommended) shown in `hermes plugins list`.
+#   author        (optional)
+#   requires_env  (optional) list of env var names the plugin needs to run.
+#                  If any are missing, the plugin still loads but its
+#                  tool `check_fn`/requires_env gate can warn at call time.
+#   provides_tools (optional, informational) list of tool names this plugin
+#                  registers — surfaced in `hermes plugins list` / docs.
+#   provides_hooks (optional, informational) lifecycle hooks this plugin uses.
+#
+# To enable a custom (user) plugin in config.yaml:
+#   plugins:
+#     enabled:
+#       - test            # your plugin `name` from above
+#   (or, to let it override a built-in tool, opt in under entries:
+#    plugins:
+#      entries:
+#        test:
+#          allow_tool_override: true)
+
+name: test
+version: 0.1.0
+description: Learning scaffold — a minimal but complete Hermes plugin template.
+author: you
+requires_env: []
+provides_tools:
+  - hello_world
+provides_hooks:
+  - post_tool_call

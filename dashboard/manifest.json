@@ -1,0 +1,11 @@
+{
+  "name": "test",
+  "label": "Test Plugin",
+  "icon": "Sparkles",
+  "version": "1.0.0",
+  "tab": {
+    "path": "/test",
+    "position": "end"
+  },
+  "entry": "dist/index.js"
+}
